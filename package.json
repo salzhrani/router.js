@@ -14,7 +14,7 @@
     "broccoli-concat": "0.0.6",
     "broccoli-concat-filenames": "^0.1.1",
     "broccoli-es3-safe-recast": "0.0.8",
-    "broccoli-es6-module-filter": "pangratz/broccoli-es6-module-filter#allow_empty_packageName",
+    "broccoli-es6modules": "^0.4.1",
     "broccoli-file-mover": "^0.2.0",
     "broccoli-jshint": "~0.5.1",
     "broccoli-merge-trees": "^0.1.3",

@@ -1,16 +1,19 @@
-"use strict";
-var merge = require("./utils").merge;
+define('commonjs/router/transition-intent', ['exports', './utils'], function (exports, utils) {
 
-function TransitionIntent(props) {
-  this.initialize(props);
+  'use strict';
 
-  // TODO: wat
-  this.data = this.data || {};
-}
+  function TransitionIntent(props) {
+    this.initialize(props);
 
-TransitionIntent.prototype = {
-  initialize: null,
-  applyToState: null
-};
+    // TODO: wat
+    this.data = this.data || {};
+  }
 
-exports["default"] = TransitionIntent;
+  TransitionIntent.prototype = {
+    initialize: null,
+    applyToState: null
+  };
+
+  exports['default'] = TransitionIntent;
+
+});

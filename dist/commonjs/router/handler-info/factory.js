@@ -1,19 +1,20 @@
-"use strict";
-var ResolvedHandlerInfo = require("router/handler-info/resolved-handler-info")["default"];
-var UnresolvedHandlerInfoByObject = require("router/handler-info/unresolved-handler-info-by-object")["default"];
-var UnresolvedHandlerInfoByParam = require("router/handler-info/unresolved-handler-info-by-param")["default"];
+define('commonjs/router/handler-info/factory', ['exports', 'router/handler-info/resolved-handler-info', 'router/handler-info/unresolved-handler-info-by-object', 'router/handler-info/unresolved-handler-info-by-param'], function (exports, ResolvedHandlerInfo, UnresolvedHandlerInfoByObject, UnresolvedHandlerInfoByParam) {
 
-handlerInfoFactory.klasses = {
-  resolved: ResolvedHandlerInfo,
-  param: UnresolvedHandlerInfoByParam,
-  object: UnresolvedHandlerInfoByObject
-};
+  'use strict';
 
-function handlerInfoFactory(name, props) {
-  var Ctor = handlerInfoFactory.klasses[name],
-      handlerInfo = new Ctor(props || {});
-  handlerInfo.factory = handlerInfoFactory;
-  return handlerInfo;
-}
+  handlerInfoFactory.klasses = {
+    resolved: ResolvedHandlerInfo['default'],
+    param: UnresolvedHandlerInfoByParam['default'],
+    object: UnresolvedHandlerInfoByObject['default']
+  };
 
-exports["default"] = handlerInfoFactory;
+  function handlerInfoFactory(name, props) {
+    var Ctor = handlerInfoFactory.klasses[name],
+        handlerInfo = new Ctor(props || {});
+    handlerInfo.factory = handlerInfoFactory;
+    return handlerInfo;
+  }
+
+  exports['default'] = handlerInfoFactory;
+
+});

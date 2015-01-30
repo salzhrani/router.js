@@ -1,4 +1,7 @@
-"use strict";
-var Router = require("./router/router")["default"];
+define('commonjs/router', ['exports', './router/router'], function (exports, Router) {
 
-exports["default"] = Router;
+	'use strict';
+
+	exports['default'] = Router['default'];
+
+});

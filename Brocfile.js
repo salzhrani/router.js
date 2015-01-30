@@ -1,5 +1,5 @@
 var concat = require('broccoli-concat');
-var filterES6Modules = require('broccoli-es6-module-filter');
+var filterES6Modules = require('broccoli-es6modules');
 var mergeTrees = require('broccoli-merge-trees');
 var moveFile = require('broccoli-file-mover');
 var pickFiles = require('broccoli-static-compiler');
@@ -33,10 +33,7 @@ function makeTests() {
   var jshintTests = jshint('test/tests');
 
   // Create AMD module 'tests' containing all tests in 'test/tests' and concatenate them into tests/tests.js
-  var tests = filterES6Modules('test/tests', {
-    moduleType: 'amd',
-    packageName: 'tests',
-    anonymous: false
+  var tests = new filterES6Modules('test/tests', {
   });
 
   tests = mergeTrees([jshintTests, jshintLib, tests]);
@@ -47,13 +44,13 @@ function makeTests() {
   });
 
   // Create /tests/tests_main.js which requires all tests (all test/tests/**/*_test.js files)
-  var testsMain = concatFilenames("test", {
-    inputFiles: ["**/*_test.js"],
-    outputFile: "/tests/tests_main.js",
-    transform: function(fileName) {
-      return "require('" + fileName  + "');";
-    }
-  });
+  // var testsMain = concatFilenames("test", {
+  //   inputFiles: ["**/*_test.js"],
+  //   outputFile: "/tests/tests_main.js",
+  //   transform: function(fileName) {
+  //     return "require('" + fileName  + "');";
+  //   }
+  // });
 
   // Copy files needed for QUnit
   var qunit = pickFiles('test', {
@@ -68,18 +65,22 @@ function makeTests() {
     outputFile: '/tests/loader.js'
   });
 
+  // Copy more files
+  var testLoader = pickFiles('test', {
+    files:  ['test-loader.js', 'runner.js'],
+    srcDir: '/',
+    destDir: '/tests'
+  });
+
   // Merge all test related stuff into tests tree
-  return mergeTrees([deps, qunit, loader, tests, testsMain]);
+  return mergeTrees([deps, qunit, loader, tests, testLoader]);
 }
 
 
 
 function createAMDTree() {
   // dist/router.amd.js: all AMD compiled modules concatenated into 1 file
-  var amd = filterES6Modules('lib', {
-    moduleType: 'amd',
-    anonymous: false
-  });
+  var amd = new filterES6Modules('lib', {});
 
   amd = concat(amd, {
     // to be consinstent with old behavior, we include 'router.js' at the end
@@ -98,7 +99,7 @@ function createCommonJSTree() {
     srcDir: '/',
     destDir: '/commonjs'
   });
-  commonJs = filterES6Modules(commonJs, {
+  commonJs = new filterES6Modules(commonJs, {
     moduleType: 'cjs'
   });
 

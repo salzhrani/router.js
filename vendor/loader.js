@@ -48,5 +48,7 @@ var define, requireModule, require, requirejs;
 
       return parentBase.join("/");
     }
+
   };
+  requirejs.entries = registry;
 })();

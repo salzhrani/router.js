@@ -1,197 +1,194 @@
-"use strict";
-var TransitionIntent = require("../transition-intent")["default"];
-var TransitionState = require("../transition-state")["default"];
-var handlerInfoFactory = require("../handler-info/factory")["default"];
-var isParam = require("../utils").isParam;
-var extractQueryParams = require("../utils").extractQueryParams;
-var merge = require("../utils").merge;
-var subclass = require("../utils").subclass;
+define('commonjs/router/transition-intent/named-transition-intent', ['exports', '../transition-intent', '../transition-state', '../handler-info/factory', '../utils'], function (exports, TransitionIntent, TransitionState, handlerInfoFactory, utils) {
 
-exports["default"] = subclass(TransitionIntent, {
-  name: null,
-  pivotHandler: null,
-  contexts: null,
-  queryParams: null,
+  'use strict';
 
-  initialize: function(props) {
-    this.name = props.name;
-    this.pivotHandler = props.pivotHandler;
-    this.contexts = props.contexts || [];
-    this.queryParams = props.queryParams;
-  },
+  exports['default'] = utils.subclass(TransitionIntent['default'], {
+    name: null,
+    pivotHandler: null,
+    contexts: null,
+    queryParams: null,
 
-  applyToState: function(oldState, recognizer, getHandler, isIntermediate) {
+    initialize: function(props) {
+      this.name = props.name;
+      this.pivotHandler = props.pivotHandler;
+      this.contexts = props.contexts || [];
+      this.queryParams = props.queryParams;
+    },
 
-    var partitionedArgs     = extractQueryParams([this.name].concat(this.contexts)),
-      pureArgs              = partitionedArgs[0],
-      queryParams           = partitionedArgs[1],
-      handlers              = recognizer.handlersFor(pureArgs[0]);
+    applyToState: function(oldState, recognizer, getHandler, isIntermediate) {
 
-    var targetRouteName = handlers[handlers.length-1].handler;
+      var partitionedArgs     = utils.extractQueryParams([this.name].concat(this.contexts)),
+        pureArgs              = partitionedArgs[0],
+        queryParams           = partitionedArgs[1],
+        handlers              = recognizer.handlersFor(pureArgs[0]);
 
-    return this.applyToHandlers(oldState, handlers, getHandler, targetRouteName, isIntermediate);
-  },
+      var targetRouteName = handlers[handlers.length-1].handler;
 
-  applyToHandlers: function(oldState, handlers, getHandler, targetRouteName, isIntermediate, checkingIfActive) {
+      return this.applyToHandlers(oldState, handlers, getHandler, targetRouteName, isIntermediate);
+    },
 
-    var i, len;
-    var newState = new TransitionState();
-    var objects = this.contexts.slice(0);
+    applyToHandlers: function(oldState, handlers, getHandler, targetRouteName, isIntermediate, checkingIfActive) {
 
-    var invalidateIndex = handlers.length;
+      var i, len;
+      var newState = new TransitionState['default']();
+      var objects = this.contexts.slice(0);
 
-    // Pivot handlers are provided for refresh transitions
-    if (this.pivotHandler) {
-      for (i = 0, len = handlers.length; i < len; ++i) {
-        if (getHandler(handlers[i].handler) === this.pivotHandler) {
-          invalidateIndex = i;
-          break;
+      var invalidateIndex = handlers.length;
+
+      // Pivot handlers are provided for refresh transitions
+      if (this.pivotHandler) {
+        for (i = 0, len = handlers.length; i < len; ++i) {
+          if (getHandler(handlers[i].handler) === this.pivotHandler) {
+            invalidateIndex = i;
+            break;
+          }
         }
       }
-    }
 
-    var pivotHandlerFound = !this.pivotHandler;
+      var pivotHandlerFound = !this.pivotHandler;
 
-    for (i = handlers.length - 1; i >= 0; --i) {
-      var result = handlers[i];
-      var name = result.handler;
-      var handler = getHandler(name);
+      for (i = handlers.length - 1; i >= 0; --i) {
+        var result = handlers[i];
+        var name = result.handler;
+        var handler = getHandler(name);
 
-      var oldHandlerInfo = oldState.handlerInfos[i];
-      var newHandlerInfo = null;
+        var oldHandlerInfo = oldState.handlerInfos[i];
+        var newHandlerInfo = null;
 
-      if (result.names.length > 0) {
-        if (i >= invalidateIndex) {
+        if (result.names.length > 0) {
+          if (i >= invalidateIndex) {
+            newHandlerInfo = this.createParamHandlerInfo(name, handler, result.names, objects, oldHandlerInfo);
+          } else {
+            newHandlerInfo = this.getHandlerInfoForDynamicSegment(name, handler, result.names, objects, oldHandlerInfo, targetRouteName, i);
+          }
+        } else {
+          // This route has no dynamic segment.
+          // Therefore treat as a param-based handlerInfo
+          // with empty params. This will cause the `model`
+          // hook to be called with empty params, which is desirable.
           newHandlerInfo = this.createParamHandlerInfo(name, handler, result.names, objects, oldHandlerInfo);
+        }
+
+        if (checkingIfActive) {
+          // If we're performing an isActive check, we want to
+          // serialize URL params with the provided context, but
+          // ignore mismatches between old and new context.
+          newHandlerInfo = newHandlerInfo.becomeResolved(null, newHandlerInfo.context);
+          var oldContext = oldHandlerInfo && oldHandlerInfo.context;
+          if (result.names.length > 0 && newHandlerInfo.context === oldContext) {
+            // If contexts match in isActive test, assume params also match.
+            // This allows for flexibility in not requiring that every last
+            // handler provide a `serialize` method
+            newHandlerInfo.params = oldHandlerInfo && oldHandlerInfo.params;
+          }
+          newHandlerInfo.context = oldContext;
+        }
+
+        var handlerToUse = oldHandlerInfo;
+        if (i >= invalidateIndex || newHandlerInfo.shouldSupercede(oldHandlerInfo)) {
+          invalidateIndex = Math.min(i, invalidateIndex);
+          handlerToUse = newHandlerInfo;
+        }
+
+        if (isIntermediate && !checkingIfActive) {
+          handlerToUse = handlerToUse.becomeResolved(null, handlerToUse.context);
+        }
+
+        newState.handlerInfos.unshift(handlerToUse);
+      }
+
+      if (objects.length > 0) {
+        throw new Error("More context objects were passed than there are dynamic segments for the route: " + targetRouteName);
+      }
+
+      if (!isIntermediate) {
+        this.invalidateChildren(newState.handlerInfos, invalidateIndex);
+      }
+
+      utils.merge(newState.queryParams, this.queryParams || {});
+
+      return newState;
+    },
+
+    invalidateChildren: function(handlerInfos, invalidateIndex) {
+      for (var i = invalidateIndex, l = handlerInfos.length; i < l; ++i) {
+        var handlerInfo = handlerInfos[i];
+        handlerInfos[i] = handlerInfos[i].getUnresolved();
+      }
+    },
+
+    getHandlerInfoForDynamicSegment: function(name, handler, names, objects, oldHandlerInfo, targetRouteName, i) {
+
+      var numNames = names.length;
+      var objectToUse;
+      if (objects.length > 0) {
+
+        // Use the objects provided for this transition.
+        objectToUse = objects[objects.length - 1];
+        if (utils.isParam(objectToUse)) {
+          return this.createParamHandlerInfo(name, handler, names, objects, oldHandlerInfo);
         } else {
-          newHandlerInfo = this.getHandlerInfoForDynamicSegment(name, handler, result.names, objects, oldHandlerInfo, targetRouteName, i);
+          objects.pop();
         }
-      } else {
-        // This route has no dynamic segment.
-        // Therefore treat as a param-based handlerInfo
-        // with empty params. This will cause the `model`
-        // hook to be called with empty params, which is desirable.
-        newHandlerInfo = this.createParamHandlerInfo(name, handler, result.names, objects, oldHandlerInfo);
-      }
-
-      if (checkingIfActive) {
-        // If we're performing an isActive check, we want to
-        // serialize URL params with the provided context, but
-        // ignore mismatches between old and new context.
-        newHandlerInfo = newHandlerInfo.becomeResolved(null, newHandlerInfo.context);
-        var oldContext = oldHandlerInfo && oldHandlerInfo.context;
-        if (result.names.length > 0 && newHandlerInfo.context === oldContext) {
-          // If contexts match in isActive test, assume params also match.
-          // This allows for flexibility in not requiring that every last
-          // handler provide a `serialize` method
-          newHandlerInfo.params = oldHandlerInfo && oldHandlerInfo.params;
-        }
-        newHandlerInfo.context = oldContext;
-      }
-
-      var handlerToUse = oldHandlerInfo;
-      if (i >= invalidateIndex || newHandlerInfo.shouldSupercede(oldHandlerInfo)) {
-        invalidateIndex = Math.min(i, invalidateIndex);
-        handlerToUse = newHandlerInfo;
-      }
-
-      if (isIntermediate && !checkingIfActive) {
-        handlerToUse = handlerToUse.becomeResolved(null, handlerToUse.context);
-      }
-
-      newState.handlerInfos.unshift(handlerToUse);
-    }
-
-    if (objects.length > 0) {
-      throw new Error("More context objects were passed than there are dynamic segments for the route: " + targetRouteName);
-    }
-
-    if (!isIntermediate) {
-      this.invalidateChildren(newState.handlerInfos, invalidateIndex);
-    }
-
-    merge(newState.queryParams, this.queryParams || {});
-
-    return newState;
-  },
-
-  invalidateChildren: function(handlerInfos, invalidateIndex) {
-    for (var i = invalidateIndex, l = handlerInfos.length; i < l; ++i) {
-      var handlerInfo = handlerInfos[i];
-      handlerInfos[i] = handlerInfos[i].getUnresolved();
-    }
-  },
-
-  getHandlerInfoForDynamicSegment: function(name, handler, names, objects, oldHandlerInfo, targetRouteName, i) {
-
-    var numNames = names.length;
-    var objectToUse;
-    if (objects.length > 0) {
-
-      // Use the objects provided for this transition.
-      objectToUse = objects[objects.length - 1];
-      if (isParam(objectToUse)) {
-        return this.createParamHandlerInfo(name, handler, names, objects, oldHandlerInfo);
-      } else {
-        objects.pop();
-      }
-    } else if (oldHandlerInfo && oldHandlerInfo.name === name) {
-      // Reuse the matching oldHandlerInfo
-      return oldHandlerInfo;
-    } else {
-      if (this.preTransitionState) {
-        var preTransitionHandlerInfo = this.preTransitionState.handlerInfos[i];
-        objectToUse = preTransitionHandlerInfo && preTransitionHandlerInfo.context;
-      } else {
-        // Ideally we should throw this error to provide maximal
-        // information to the user that not enough context objects
-        // were provided, but this proves too cumbersome in Ember
-        // in cases where inner template helpers are evaluated
-        // before parent helpers un-render, in which cases this
-        // error somewhat prematurely fires.
-        //throw new Error("Not enough context objects were provided to complete a transition to " + targetRouteName + ". Specifically, the " + name + " route needs an object that can be serialized into its dynamic URL segments [" + names.join(', ') + "]");
+      } else if (oldHandlerInfo && oldHandlerInfo.name === name) {
+        // Reuse the matching oldHandlerInfo
         return oldHandlerInfo;
-      }
-    }
-
-    return handlerInfoFactory('object', {
-      name: name,
-      handler: handler,
-      context: objectToUse,
-      names: names
-    });
-  },
-
-  createParamHandlerInfo: function(name, handler, names, objects, oldHandlerInfo) {
-    var params = {};
-
-    // Soak up all the provided string/numbers
-    var numNames = names.length;
-    while (numNames--) {
-
-      // Only use old params if the names match with the new handler
-      var oldParams = (oldHandlerInfo && name === oldHandlerInfo.name && oldHandlerInfo.params) || {};
-
-      var peek = objects[objects.length - 1];
-      var paramName = names[numNames];
-      if (isParam(peek)) {
-        params[paramName] = "" + objects.pop();
       } else {
-        // If we're here, this means only some of the params
-        // were string/number params, so try and use a param
-        // value from a previous handler.
-        if (oldParams.hasOwnProperty(paramName)) {
-          params[paramName] = oldParams[paramName];
+        if (this.preTransitionState) {
+          var preTransitionHandlerInfo = this.preTransitionState.handlerInfos[i];
+          objectToUse = preTransitionHandlerInfo && preTransitionHandlerInfo.context;
         } else {
-          throw new Error("You didn't provide enough string/numeric parameters to satisfy all of the dynamic segments for route " + name);
+          // Ideally we should throw this error to provide maximal
+          // information to the user that not enough context objects
+          // were provided, but this proves too cumbersome in Ember
+          // in cases where inner template helpers are evaluated
+          // before parent helpers un-render, in which cases this
+          // error somewhat prematurely fires.
+          //throw new Error("Not enough context objects were provided to complete a transition to " + targetRouteName + ". Specifically, the " + name + " route needs an object that can be serialized into its dynamic URL segments [" + names.join(', ') + "]");
+          return oldHandlerInfo;
         }
       }
-    }
 
-    return handlerInfoFactory('param', {
-      name: name,
-      handler: handler,
-      params: params
-    });
-  }
+      return handlerInfoFactory['default']('object', {
+        name: name,
+        handler: handler,
+        context: objectToUse,
+        names: names
+      });
+    },
+
+    createParamHandlerInfo: function(name, handler, names, objects, oldHandlerInfo) {
+      var params = {};
+
+      // Soak up all the provided string/numbers
+      var numNames = names.length;
+      while (numNames--) {
+
+        // Only use old params if the names match with the new handler
+        var oldParams = (oldHandlerInfo && name === oldHandlerInfo.name && oldHandlerInfo.params) || {};
+
+        var peek = objects[objects.length - 1];
+        var paramName = names[numNames];
+        if (utils.isParam(peek)) {
+          params[paramName] = "" + objects.pop();
+        } else {
+          // If we're here, this means only some of the params
+          // were string/number params, so try and use a param
+          // value from a previous handler.
+          if (oldParams.hasOwnProperty(paramName)) {
+            params[paramName] = oldParams[paramName];
+          } else {
+            throw new Error("You didn't provide enough string/numeric parameters to satisfy all of the dynamic segments for route " + name);
+          }
+        }
+      }
+
+      return handlerInfoFactory['default']('param', {
+        name: name,
+        handler: handler,
+        params: params
+      });
+    }
+  });
+
 });

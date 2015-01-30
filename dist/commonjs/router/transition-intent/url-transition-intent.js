@@ -1,66 +1,64 @@
-"use strict";
-var TransitionIntent = require("../transition-intent")["default"];
-var TransitionState = require("../transition-state")["default"];
-var handlerInfoFactory = require("../handler-info/factory")["default"];
-var oCreate = require("../utils").oCreate;
-var merge = require("../utils").merge;
-var subclass = require("../utils").subclass;
+define('commonjs/router/transition-intent/url-transition-intent', ['exports', '../transition-intent', '../transition-state', '../handler-info/factory', '../utils'], function (exports, TransitionIntent, TransitionState, handlerInfoFactory, utils) {
 
-exports["default"] = subclass(TransitionIntent, {
-  url: null,
+  'use strict';
 
-  initialize: function(props) {
-    this.url = props.url;
-  },
+  exports['default'] = utils.subclass(TransitionIntent['default'], {
+    url: null,
 
-  applyToState: function(oldState, recognizer, getHandler) {
-    var newState = new TransitionState();
+    initialize: function(props) {
+      this.url = props.url;
+    },
 
-    var results = recognizer.recognize(this.url),
-        queryParams = {},
-        i, len;
+    applyToState: function(oldState, recognizer, getHandler) {
+      var newState = new TransitionState['default']();
 
-    if (!results) {
-      throw new UnrecognizedURLError(this.url);
-    }
+      var results = recognizer.recognize(this.url),
+          queryParams = {},
+          i, len;
 
-    var statesDiffer = false;
-
-    for (i = 0, len = results.length; i < len; ++i) {
-      var result = results[i];
-      var name = result.handler;
-      var handler = getHandler(name);
-
-      if (handler.inaccessibleByURL) {
+      if (!results) {
         throw new UnrecognizedURLError(this.url);
       }
 
-      var newHandlerInfo = handlerInfoFactory('param', {
-        name: name,
-        handler: handler,
-        params: result.params
-      });
+      var statesDiffer = false;
 
-      var oldHandlerInfo = oldState.handlerInfos[i];
-      if (statesDiffer || newHandlerInfo.shouldSupercede(oldHandlerInfo)) {
-        statesDiffer = true;
-        newState.handlerInfos[i] = newHandlerInfo;
-      } else {
-        newState.handlerInfos[i] = oldHandlerInfo;
+      for (i = 0, len = results.length; i < len; ++i) {
+        var result = results[i];
+        var name = result.handler;
+        var handler = getHandler(name);
+
+        if (handler.inaccessibleByURL) {
+          throw new UnrecognizedURLError(this.url);
+        }
+
+        var newHandlerInfo = handlerInfoFactory['default']('param', {
+          name: name,
+          handler: handler,
+          params: result.params
+        });
+
+        var oldHandlerInfo = oldState.handlerInfos[i];
+        if (statesDiffer || newHandlerInfo.shouldSupercede(oldHandlerInfo)) {
+          statesDiffer = true;
+          newState.handlerInfos[i] = newHandlerInfo;
+        } else {
+          newState.handlerInfos[i] = oldHandlerInfo;
+        }
       }
+
+      utils.merge(newState.queryParams, results.queryParams);
+
+      return newState;
     }
+  });
 
-    merge(newState.queryParams, results.queryParams);
-
-    return newState;
+  /**
+    Promise reject reasons passed to promise rejection
+    handlers for failed transitions.
+   */
+  function UnrecognizedURLError(message) {
+    this.message = (message || "UnrecognizedURLError");
+    this.name = "UnrecognizedURLError";
   }
-});
 
-/**
-  Promise reject reasons passed to promise rejection
-  handlers for failed transitions.
- */
-function UnrecognizedURLError(message) {
-  this.message = (message || "UnrecognizedURLError");
-  this.name = "UnrecognizedURLError";
-}
+});

@@ -1,27 +1,27 @@
-"use strict";
-var HandlerInfo = require("../handler-info")["default"];
-var subclass = require("router/utils").subclass;
-var promiseLabel = require("router/utils").promiseLabel;
-var Promise = require("rsvp/promise")["default"];
+define('commonjs/router/handler-info/resolved-handler-info', ['exports', '../handler-info', 'router/utils', 'rsvp/promise'], function (exports, HandlerInfo, utils, Promise) {
 
-var ResolvedHandlerInfo = subclass(HandlerInfo, {
-  resolve: function(shouldContinue, payload) {
-    // A ResolvedHandlerInfo just resolved with itself.
-    if (payload && payload.resolvedModels) {
-      payload.resolvedModels[this.name] = this.context;
-    }
-    return Promise.resolve(this, this.promiseLabel("Resolve"));
-  },
+  'use strict';
 
-  getUnresolved: function() {
-    return this.factory('param', {
-      name: this.name,
-      handler: this.handler,
-      params: this.params
-    });
-  },
+  var ResolvedHandlerInfo = utils.subclass(HandlerInfo['default'], {
+    resolve: function(shouldContinue, payload) {
+      // A ResolvedHandlerInfo just resolved with itself.
+      if (payload && payload.resolvedModels) {
+        payload.resolvedModels[this.name] = this.context;
+      }
+      return Promise['default'].resolve(this, this.promiseLabel("Resolve"));
+    },
 
-  isResolved: true
+    getUnresolved: function() {
+      return this.factory('param', {
+        name: this.name,
+        handler: this.handler,
+        params: this.params
+      });
+    },
+
+    isResolved: true
+  });
+
+  exports['default'] = ResolvedHandlerInfo;
+
 });
-
-exports["default"] = ResolvedHandlerInfo;
